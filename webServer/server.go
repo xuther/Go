@@ -110,7 +110,10 @@ type JSONVersion struct {
 func main() {
 	var port = flag.Int("port", 8080, "The port number you want the server running on. Default is 8080")
 
-	fmt.Println("here!")
+	flag.Parse()
+
+	fmt.Println(port)
+
 	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("Static/"))))
 	http.HandleFunc("/pages/", loadHTMLPage)
 	http.HandleFunc("/redirect/", redirect)
