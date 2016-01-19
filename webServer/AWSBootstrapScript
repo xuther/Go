@@ -1,0 +1,13 @@
+#!/bin/bash
+sudo apt-get --assume-yes update
+sudo apt-get --assume-yes install git
+sudo apt-get --assume-yes install golang
+mkdir -p ~/go/src/github.com/xuther/
+mkdir ~/go/bin
+export GOPATH=~/go
+cd ~/go/src/github.com/xuther/
+git clone https://github.com/xuther/Go.git
+cd Go/webServer
+go get
+go install
+sudo $GOPATH/bin/webServer
