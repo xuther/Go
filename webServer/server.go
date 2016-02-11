@@ -1,123 +1,241 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strconv"
+	"time"
+
+	"golang.org/x/crypto/bcrypt"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
 
-func loadBasePage(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path[1:] == "" {
-		fmt.Fprintf(w, getStaticPage("index.html"))
-	} else {
-		fmt.Fprintf(w, getStaticPage(r.URL.Path[1:]))
-	}
+//We should redo all this session stuff with JWT sometime soon
+//SessionTimeout in terms of minutes.
+var sessionTimeout = 10.0
+
+type userInformation struct {
+	Username string
+	Password []byte
 }
 
-func loadHTMLPage(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain")
-	fmt.Fprintf(w, getStaticPage(r.URL.Path[1:]))
+type userInformationWithID struct {
+	Username string
+	Password []byte
+	ID       bson.ObjectId "_id"
 }
 
-func loadImages(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("images " + r.URL.Path[1:])
-	fmt.Fprintf(w, getPage("images/"+r.URL.Path[1:]))
+type loginInformation struct {
+	Username string
+	Password string
 }
 
-func getStaticPage(path string) string {
-	return getPage("Static/" + path)
+type sessionInfo struct {
+	SessionKey string
+	UserID     string
+	LoginTime  time.Time
+	LastSeen   time.Time
 }
 
-func getPage(path string) string {
-	dat, err := ioutil.ReadFile(path)
+func generateSessionString(s int) string {
+	b := make([]byte, s)
+	_, err := rand.Read(b)
 
 	check(err)
 
-	return string(dat)
+	return base64.URLEncoding.EncodeToString(b)
 }
 
-func redirect(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Query()
+func checkCredentials(username string, password string) (userInformationWithID, bool) {
+	fmt.Println("Check Credentials")
 
-	switch path.Get("p") {
-	case "1":
-		http.Redirect(w, r, "http://www.google.com", 301)
-		break
-	case "2":
-		http.Redirect(w, r, "http://www.byu.edu", 301)
-		break
-	case "3":
-		http.Redirect(w, r, "http://www.amazon.com", 301)
-		break
-	}
-}
+	session, err := mgo.Dial("localhost")
+	check(err)
+	defer session.Close()
 
-func print(w http.ResponseWriter, r *http.Request) {
-	toReturn := "Headers: \n"
+	session.SetMode(mgo.Monotonic, true)
+	c := session.DB("test").C("Users")
 
-	for k, v := range r.Header {
-		toReturn += k + ": "
-		for _, val := range v {
-			toReturn += val
+	result := userInformationWithID{}
+	err = c.Find(bson.M{"username": username}).One(&result)
+	check(err)
+
+	fmt.Println("Results: \n ID:", result.ID)
+	fmt.Println("Username: ", result.Username)
+
+	if result.Password != nil {
+		err = bcrypt.CompareHashAndPassword(result.Password, []byte(password))
+		if err == nil {
+			return result, true
 		}
-		toReturn += "\n"
 	}
 
-	toReturn += "\nQuery: \n" + r.URL.RawQuery + "\n"
-
-	toReturn += "Body: \n"
-
-	body, _ := ioutil.ReadAll(r.Body)
-
-	toReturn += string(body)
-
-	fmt.Fprintf(w, toReturn)
+	return result, false
 }
 
-func version(w http.ResponseWriter, r *http.Request) {
-	t := r.Header.Get("Accept")
-	w.Header().Set("Content-Type", "application/json")
-	var toReturn JSONVersion
+func takeAction(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Taking Action")
+	fmt.Println("Checking Cookies")
 
-	switch t {
-	case "application/vnd.byu.cs462.v1+json":
-		toReturn = JSONVersion{"v1"}
-		break
-	case "application/vnd.byu.cs462.v2+json":
-		toReturn = JSONVersion{"v2"}
-		break
-	}
+	cookie, err := r.Cookie("Session")
+	check(err)
 
-	bytes, _ := json.Marshal(toReturn)
-
-	fmt.Fprintf(w, string(bytes))
-}
-
-func check(e error) {
-	if e != nil {
-		panic(e)
+	if checkSession(cookie.Value) {
+		fmt.Fprintf(w, "Success")
+	} else {
+		fmt.Fprintf(w, "Failure")
 	}
 }
 
-//JSONVersion type to return the JSON version
-type JSONVersion struct {
-	Version string
+func login(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Testing")
+
+	decoder := json.NewDecoder(r.Body)
+
+	var login loginInformation
+
+	err := decoder.Decode(&login)
+	check(err)
+
+	User, value := checkCredentials(login.Username, login.Password)
+
+	if value {
+		//We need to add the sessionID to the DB and delete the old sessionKey
+		//associated with that key, if there is one.
+
+		//check if there is a current session associated with the user.
+		session := checkSessionByUsername(User.ID.Hex())
+
+		sessionID := generateSessionString(64)
+
+		if session.SessionKey == "" {
+			createSession(sessionID, User.ID.Hex())
+		} else {
+			removeSession(string(session.SessionKey))
+			createSession(sessionID, User.ID.Hex())
+		}
+
+		newCookie := http.Cookie{Name: "Session", Value: sessionID}
+		http.SetCookie(w, &newCookie)
+		fmt.Fprintf(w, "Success")
+		return
+	}
+	fmt.Fprintf(w, "Failure")
+}
+
+func removeSession(sessionID string) {
+	fmt.Println("Removing Session", sessionID)
+	session, err := mgo.Dial("localhost")
+	check(err)
+	defer session.Close()
+
+	session.SetMode(mgo.Monotonic, true)
+	c := session.DB("test").C("Sessions")
+
+	c.Remove(bson.M{"sessionkey": sessionID})
+
+}
+
+func createSession(sessionID string, userID string) {
+	fmt.Println("Creating Session")
+
+	session, err := mgo.Dial("localhost")
+	check(err)
+	defer session.Close()
+
+	session.SetMode(mgo.Monotonic, true)
+	c := session.DB("test").C("Sessions")
+
+	toInsert := sessionInfo{sessionID, userID, time.Now(), time.Now()}
+	c.Insert(&toInsert)
+
+}
+
+func checkSessionByUsername(username string) sessionInfo {
+	fmt.Println("Retrieving Session for ", username)
+	session, err := mgo.Dial("localhost")
+	check(err)
+	defer session.Close()
+
+	session.SetMode(mgo.Monotonic, true)
+	c := session.DB("test").C("Sessions")
+
+	result := sessionInfo{}
+	_ = c.Find(bson.M{"userid": username}).One(&result)
+
+	fmt.Println("Session Key: ", result.SessionKey)
+
+	return result
+}
+
+//check to see if the session is active/valid.
+func checkSession(sessionKey string) bool {
+
+	fmt.Println("Checking Session")
+
+	session, err := mgo.Dial("localhost")
+	check(err)
+	defer session.Close()
+
+	session.SetMode(mgo.Monotonic, true)
+	c := session.DB("test").C("Sessions")
+
+	result := sessionInfo{}
+	_ = c.Find(bson.M{"sessionkey": sessionKey}).One(&result)
+
+	fmt.Println("Results", result)
+
+	if result.SessionKey != "" {
+		elapsed := time.Since(result.LastSeen)
+		if elapsed.Minutes() > sessionTimeout {
+			return false
+		}
+		//There was a session key, and it hasn't expired yet.
+		return true
+
+	}
+	return false
+}
+
+func register(username string, password string) {
+	fmt.Println("Register")
+
+	session, err := mgo.Dial("localhost")
+	check(err)
+	defer session.Close()
+
+	session.SetMode(mgo.Monotonic, true)
+
+	pass, err := bcrypt.GenerateFromPassword([]byte(password), 10)
+	check(err)
+
+	toSave := userInformation{username, pass}
+	c := session.DB("test").C("Users")
+	err = c.Insert(&toSave)
+
+	check(err)
+}
+
+func check(err error) {
+	if err != nil {
+		panic(err)
+	}
 }
 
 func main() {
 	var port = flag.Int("port", 8080, "The port number you want the server running on. Default is 8080")
+	fmt.Println(checkCredentials("test", "test"))
 
 	flag.Parse()
 
-	fmt.Println(port)
-
 	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("Static/"))))
-	http.HandleFunc("/pages/", loadHTMLPage)
-	http.HandleFunc("/redirect/", redirect)
-	http.HandleFunc("/print/", print)
-	http.HandleFunc("/version/", version)
+	http.HandleFunc("/api/login", login)
+	http.HandleFunc("/api/action", takeAction)
 	http.ListenAndServe(":"+strconv.Itoa(*port), nil)
+
 }
