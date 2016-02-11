@@ -1,0 +1,31 @@
+.UserList table {
+    border-collapse: collapse;
+    width: 80%;
+    margin: auto;
+}
+
+.UserList {
+  width: 100%
+  align-content: center;
+  text-align: center;
+}
+
+.UserList th {
+    padding: 8px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.UserList td {
+    padding: 6px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.UserItems:hover {
+  background-color: #f5f5f5
+}
+
+.UserTable {
+      border: 1px solid #ccc;
+}

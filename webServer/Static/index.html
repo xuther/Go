@@ -1,23 +1,53 @@
 <html>
   <head>
+    <link rel="stylesheet" href="css/index.css">
+    <link rel="stylesheet" href="css/general.css">
+    <link rel="stylesheet" href="css/navbar.css">
   </head>
   <body>
-    <h1> Joseph Blodgett </h1>
-    <h2>Bootstrap Script</h2>
-    <p>#!/bin/bash<br>
-    sudo apt-get --assume-yes update<br>
-    sudo apt-get --assume-yes install git<br>
-    sudo apt-get --assume-yes install golang<br>
-    mkdir -p /home/usr/ubuntu/go/src/github.com/xuther/<br>
-    mkdir /home/usr/ubuntu/go/bin<br>
-    export GOPATH=/home/usr/ubuntu/go<br>
-    cd /home/usr/ubuntu/go/src/github.com/xuther/<br>
-    git clone https://github.com/xuther/Go.git<br>
-    cd Go/webServer<br>
-    go get<br>
-    go install<br>
-    sudo $GOPATH/bin/webServer</p>
-    <h2>AMI ID</h2>
-    <p>i-594f4880</p>
+    <div class="navbar">
+      <ul>
+        <!-- I want to hide these if they're not logged in/ have it redirect to
+        login -->
+        <li><a href="index.html">Home</a></li>
+        <li><a href="userAccount.html">My Account</a></li>
+
+        <li><a href="login.html">Login</a></li>
+        <li><a href="register.html">Register</a></li>
+      </ul>
+    </div>
+    <div class="UserList">
+      <h2> User Information </h2>
+      <table class="UserTable">
+        <tr>
+          <th>UserName</th>
+          <th>Information1</th>
+          <th>Information2</th>
+          <th>Information3</th>
+          <th>Information4</th>
+        </tr>
+        <tr class="UserItems">
+          <td>JoeBlo</td>
+          <td>TestData</td>
+          <td>TestData</td>
+          <td>TestData</td>
+          <td>TestData</td>
+        </tr>
+        <tr class="UserItems">
+          <td>Jesse</td>
+          <td>TestData</td>
+          <td>TestData</td>
+          <td>TestData</td>
+          <td>TestData</td>
+        </tr>
+        <tr class="UserItems">
+          <td>SomeoneElse</td>
+          <td>TestData</td>
+          <td>TestData</td>
+          <td>TestData</td>
+          <td>TestData</td>
+        </tr>
+      </table>
+    </div>
   </body>
 </html>
