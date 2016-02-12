@@ -62,7 +62,7 @@ func removeSession(sessionID string) {
 }
 
 func createSession(sessionID string, userID string) {
-	fmt.Println("Creating Session")
+	fmt.Println("Creating Session...")
 
 	session, err := mgo.Dial("localhost")
 	check(err)
@@ -73,7 +73,7 @@ func createSession(sessionID string, userID string) {
 
 	toInsert := sessionInfo{sessionID, userID, time.Now(), time.Now()}
 	c.Insert(&toInsert)
-
+	fmt.Println("Done.")
 }
 
 func findUserBySession(sessionKey string) userInformationWithID {
@@ -114,7 +114,7 @@ func checkSessionByUsername(username string) sessionInfo {
 //check to see if the session is active/valid.
 func checkSession(sessionKey string) bool {
 
-	fmt.Println("Checking Session")
+	fmt.Println("Checking Session...")
 
 	session, err := mgo.Dial("localhost")
 	check(err)
@@ -126,13 +126,14 @@ func checkSession(sessionKey string) bool {
 	result := sessionInfo{}
 	_ = c.Find(bson.M{"sessionkey": sessionKey}).One(&result)
 
-	fmt.Println("Results", result)
-
 	if result.SessionKey != "" {
+		fmt.Println("Session key exists.")
 		elapsed := time.Since(result.LastSeen)
 		if elapsed.Minutes() > sessionTimeout {
+			fmt.Println("Session Inactive.")
 			return false
 		}
+		fmt.Println("Session Active.")
 		//There was a session key, and it hasn't expired yet.
 		return true
 
@@ -162,7 +163,7 @@ func checkForUsername(username string) bool {
 }
 
 func checkCredentials(username string, password string) (userInformationWithID, bool) {
-	fmt.Println("Check Credentials")
+	fmt.Println("Check Credentials for: ", username)
 
 	session, err := mgo.Dial("localhost")
 	check(err)

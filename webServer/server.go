@@ -135,10 +135,15 @@ func login(w http.ResponseWriter, r *http.Request) {
 			removeSession(string(session.SessionKey))
 			createSession(sessionID, User.ID.Hex())
 		}
+		fmt.Println("Session created, generating cookie...")
 
 		newCookie := http.Cookie{Name: "Session", Value: sessionID}
 		http.SetCookie(w, &newCookie)
+
+		fmt.Println("Done.")
 		fmt.Fprintf(w, "Success")
+
+		fmt.Println("Login operation succeeded")
 		return
 	}
 	fmt.Fprintf(w, "Failure")
@@ -171,7 +176,7 @@ func check(err error) {
 }
 
 func main() {
-	var port = flag.Int("port", 8080, "The port number you want the server running on. Default is 8080")
+	var port = flag.Int("port", 443, "The port number you want the server running on. Default is 8080")
 
 	flag.Parse()
 
@@ -181,6 +186,8 @@ func main() {
 	http.HandleFunc("/api/getOathToken", getOathTokenHandler)
 	http.HandleFunc("/api/register", registerHandle)
 	http.HandleFunc("/api/action", takeAction)
-	http.ListenAndServeTLS(":"+strconv.Itoa(*port), "server.pem", "server.key", nil)
+	err := http.ListenAndServeTLS(":"+strconv.Itoa(*port), "server.pem", "server.key", nil)
+
+	check(err)
 
 }

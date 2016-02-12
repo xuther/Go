@@ -38,22 +38,22 @@
   display: inline-block;
   padding-bottom: 5px;
 }
-.login form .input-group {
+.login .input-group {
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
-.login form .input-group:last-of-type {
+.login .input-group:last-of-type {
   border-top: none;
 }
-.login form .input-group span {
+.login .input-group span {
   background: transparent;
   min-width: 53px;
   border: none;
 }
-.login form .input-group span i {
+.login .input-group span i {
   font-size: 1.5em;
 }
-.login form input.form-control {
+.login input.form-control {
   display: block;
   width: auto;
   height: auto;
@@ -68,10 +68,10 @@
   background: transparent;
   color: black;
 }
-.login form input.form-control:focus {
+.login input.form-control:focus {
   border: none;
 }
-.login form button {
+.login button {
   margin-top: 20px;
   background: #27AE60;
   border: none;
@@ -83,7 +83,7 @@
   color: White;
   border-bottom: 4px solid #1e8449;
 }
-.login form button:hover {
+.login button:hover {
   background: #2fb166;
   -webkit-animation: hop 1s;
   animation: hop 1s;
@@ -103,4 +103,28 @@
 .float:hover, .float:focus, .float:active {
   -webkit-transform: translateY(-3px);
   transform: translateY(-3px);
+}
+
+/* Large Devices, Wide Screens */
+@media only screen and (max-width: 1200px) {
+  .login {
+    width: 600px;
+    font-size: 2em;
+  }
+  .navbar{
+    width: 600px;
+    margin: 0, 100px, 0, 100px;
+  }
+}
+
+@media only screen and (max-width: 1100px) {
+  .login {
+    margin-top: 2%;
+    width: 600px;
+    font-size: 1.7em;
+  }
+    .navbar{
+    width: 600px;
+        margin: 0, 100px, 0, 100px;
+  }
 }

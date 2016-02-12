@@ -5,12 +5,10 @@ makePostCall = function  (url, data, callback){
      url: url,
      data: json_data,
      contentType: "application/json;charset=utf-8"
-   }).always(callback);
+   }).success(callback)
 }
 
 login = function(){
-
-
   username = $("#loginUsername").val();
   password = $("#loginPassword").val();
 
@@ -52,7 +50,6 @@ loginCall = function(username, password)
   { 'Username': username,
     'Password': password
   }, function(data) {
-     console.log(data);
      loggedIn(data);
    })
 }
@@ -82,7 +79,7 @@ getToken = function() {
 
 loggedIn = function(data) {
   console.log(data)
-    if (data == "Success"){
+  if (data == "Success"){
     window.location.href= '/';
   }
   else {
