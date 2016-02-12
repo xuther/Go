@@ -76,6 +76,24 @@ func createSession(sessionID string, userID string) {
 
 }
 
+func findUserBySession(sessionKey string) userInformationWithID {
+	fmt.Println("Retrieving User for session ", sessionKey)
+
+	session, err := mgo.Dial("localhost")
+	check(err)
+	defer session.Close()
+
+	session.SetMode(mgo.Monotonic, true)
+	c := session.DB("test").C("Sessions")
+
+	result := userInformationWithID{}
+	_ = c.Find(bson.M{"sessionkey": sessionKey}).One(&result)
+
+	fmt.Println("UserName: ", result)
+
+	return result
+}
+
 func checkSessionByUsername(username string) sessionInfo {
 	fmt.Println("Retrieving Session for ", username)
 	session, err := mgo.Dial("localhost")
