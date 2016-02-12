@@ -104,27 +104,3 @@
   -webkit-transform: translateY(-3px);
   transform: translateY(-3px);
 }
-
-/* Large Devices, Wide Screens */
-@media only screen and (max-width: 1200px) {
-  .login {
-    width: 600px;
-    font-size: 2em;
-  }
-  .navbar{
-    width: 600px;
-    margin: 0, 100px, 0, 100px;
-  }
-}
-
-@media only screen and (max-width: 1100px) {
-  .login {
-    margin-top: 2%;
-    width: 600px;
-    font-size: 1.7em;
-  }
-    .navbar{
-    width: 600px;
-        margin: 0, 100px, 0, 100px;
-  }
-}

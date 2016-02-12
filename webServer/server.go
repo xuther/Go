@@ -34,7 +34,7 @@ func getOathToken(userID string, ClientID string, ClientSecret string, RedirectU
 	check(err)
 }
 func login(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Testing")
+	fmt.Println("Logging In")
 
 	decoder := json.NewDecoder(r.Body)
 
@@ -69,6 +69,26 @@ func login(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Failure")
 }
 
+func registerHandle(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Registering")
+
+	decoder := json.NewDecoder(r.Body)
+
+	var login loginInformation
+
+	err := decoder.Decode(&login)
+	check(err)
+
+	//we should check to see if the username already exists
+	if !checkForUsername(login.Username) {
+		fmt.Fprintf(w, "Username Exists")
+		return
+	}
+	register(login.Username, login.Password)
+
+	fmt.Fprintf(w, "Success")
+}
+
 func check(err error) {
 	if err != nil {
 		panic(err)
@@ -82,6 +102,7 @@ func main() {
 
 	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("Static/"))))
 	http.HandleFunc("/api/login", login)
+	http.HandleFunc("/api/register", registerHandle)
 	http.HandleFunc("/api/action", takeAction)
 	http.ListenAndServeTLS(":"+strconv.Itoa(*port), "server.pem", "server.key", nil)
 

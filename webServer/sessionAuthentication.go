@@ -122,6 +122,27 @@ func checkSession(sessionKey string) bool {
 	return false
 }
 
+func checkForUsername(username string) bool {
+	fmt.Println("Checking name ", username, "...")
+
+	session, err := mgo.Dial("localhost")
+	check(err)
+	defer session.Close()
+
+	session.SetMode(mgo.Monotonic, true)
+	c := session.DB("test").C("Users")
+
+	result := userInformationWithID{}
+	err = c.Find(bson.M{"username": username}).One(&result)
+	if err == nil {
+		fmt.Println("Name Exists")
+		return false
+	}
+	fmt.Println("No Name Exists")
+	return true
+
+}
+
 func checkCredentials(username string, password string) (userInformationWithID, bool) {
 	fmt.Println("Check Credentials")
 
