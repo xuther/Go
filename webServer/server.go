@@ -189,5 +189,4 @@ func main() {
 	err := http.ListenAndServeTLS(":"+strconv.Itoa(*port), "server.pem", "server.key", nil)
 
 	check(err)
-
 }
