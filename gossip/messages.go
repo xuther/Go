@@ -104,9 +104,10 @@ func addPeer(address string) {
 
 	//first we check to see if the peer already exists.
 	var peer = Peer{}
-	err = c.Find(bson.M{"address": address}).One(&peer)
+	err = c.Find(bson.M{"endpoint": address}).One(&peer)
 
 	if err == nil {
+		log.Println("Peer already in system. Returning.")
 		//the peer already exists, do nothing
 		return
 	}
@@ -117,8 +118,33 @@ func addPeer(address string) {
 	log.Println("Peer added.")
 }
 
-func evaluateNeededMessages(list []MessageTracking) []Rumor {
+func evaluateNeededMessages(list map[string]int) []Rumor {
 	log.Println("Evaluating needed messages...")
+
+	var rumors []Rumor
+
+	//pull all of our messages
+	messageList := getAllMessages()
+
+	for _, mt := range messageList {
+		highestMessageNo, ok := list[mt.Messagelist[0].MessageUUID]
+		if !ok {
+			rumors = append(rumors, mt.Messagelist...)
+		} else {
+			for _, message := range mt.Messagelist {
+				if message.MessageNo > highestMessageNo {
+					rumors = append(rumors, message)
+				}
+			}
+		}
+	}
+
+	log.Println("Done. ", strconv.Itoa(len(rumors)), " messages found for forwarding.")
+
+	return rumors
+}
+
+func getAllMessages() []MessageList {
 	session, err := mgo.Dial("localhost")
 	check(err)
 	defer session.Close()
@@ -126,22 +152,30 @@ func evaluateNeededMessages(list []MessageTracking) []Rumor {
 	session.SetMode(mgo.Monotonic, true)
 	c := session.DB(dbName).C("messages")
 
-	var rumors []Rumor
-	var tempRumors []Rumor
-	var uuidList []string
+	var AllMessageLists []MessageList
 
-	for _, mt := range list {
-		c.Find(bson.M{"messageuuid": mt.MessageUUID, "messageno": bson.M{"$gt": mt.MessageNo}}).All(&tempRumors)
-		uuidList = append(uuidList, mt.MessageUUID)
-		rumors = append(rumors, tempRumors...)
+	c.Find(nil).All(&AllMessageLists)
+	return AllMessageLists
+}
+
+func findGreatestValue() map[string]int {
+
+	AllMessageLists := getAllMessages()
+
+	rumorList := map[string]int{}
+
+	for _, v := range AllMessageLists {
+		//iterate through and find the message with the highest value.
+		curBest := -1
+		for _, r := range v.Messagelist {
+			if curBest < r.MessageNo {
+				curBest = r.MessageNo
+			}
+		}
+		rumorList[v.Messagelist[0].MessageUUID] = curBest
 	}
 
-	c.Find(bson.M{"$not": bson.M{"messageuuid": uuidList}}).All(&tempRumors)
-	rumors = append(rumors, tempRumors...)
-
-	log.Println("Done. ", strconv.Itoa(len(rumors)), " messages found for forwarding.")
-
-	return rumors
+	return rumorList
 }
 
 //Function to be run on it's own thread, will accept
@@ -167,8 +201,10 @@ func sendRumor(toSend Rumor, Source string, Dest string) {
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 	client := &http.Client{Transport: tr}
 
-	toSendRumor := RumorToSend{toSend.MessageUUID, toSend.Originator, toSend.Text}
+	toSendRumor := RumorToSend{toSend.MessageID, toSend.Originator, toSend.Text}
 	toSendFormat := RumorMessage{toSendRumor, Source}
+
+	log.Println("Message format: ", toSendFormat)
 
 	b, err := json.Marshal(toSendFormat)
 	check(err)
@@ -193,11 +229,14 @@ func processWant(wantMessage Want, messagestoSend chan<- RumorListToSend) {
 	//translate to Peer object
 	var translateBuffer []MessageTracking
 
+	log.Println("Building Translate Buffer...")
 	//Create what we need
 	for k, v := range wantMessage.Want {
 		toAppend := MessageTracking{k + ":" + strconv.Itoa(v), k, v}
 		translateBuffer = append(translateBuffer, toAppend)
+		log.Println(toAppend, " added.")
 	}
+	log.Println("Done building the message UUID list.")
 	P := Peer{wantMessage.EndPoint, translateBuffer}
 
 	//ensure that the peer exsits
@@ -207,7 +246,7 @@ func processWant(wantMessage Want, messagestoSend chan<- RumorListToSend) {
 	addWant(P)
 
 	//We need to evaluate all the messages that the user doesn't have.
-	messages := evaluateNeededMessages(translateBuffer)
+	messages := evaluateNeededMessages(wantMessage.Want)
 
 	messageToSend := RumorListToSend{wantMessage.EndPoint, messages}
 	if len(messageToSend.Messages) != 0 {
@@ -246,25 +285,8 @@ func sendWant(dest string, message Want) {
 
 func buildWant(source string) Want {
 	log.Println("Building the want message...")
-	session, err := mgo.Dial("localhost")
-	check(err)
-	defer session.Close()
 
-	session.SetMode(mgo.Monotonic, true)
-	c := session.DB(dbName).C("messages")
-
-	var AllMessageLists []MessageList
-
-	var rumorList map[string]int
-	rumorList = make(map[string]int)
-
-	c.Find(nil).All(&AllMessageLists)
-
-	var r Rumor
-	for _, v := range AllMessageLists {
-		c.FindId(v.Messagelist[0].MessageUUID).Sort("-MessageID").One(&r)
-		rumorList[r.MessageUUID] = r.MessageNo
-	}
+	rumorList := findGreatestValue()
 
 	toReturn := Want{rumorList, source}
 	log.Println("Want message built.")
@@ -280,9 +302,23 @@ func getPeers() []string {
 	session.SetMode(mgo.Monotonic, true)
 	c := session.DB(dbName).C("peers")
 
+	//--------------
+	//It would be ideal to be able to select jsut the string with the address.
+	//but that will be fixed at a later date. What I had isn't working
+	//----------------------
+	//var peerEndpoints []string
+	//c.Find(nil).Select(bson.M{"_id": 0, "endpoint": 1}).All(&peerEndpoints)
+
+	var peers []Peer
+	c.Find(nil).All(&peers)
+
 	var peerEndpoints []string
-	c.Find(nil).Select(bson.M{"_ID": 0, "endpoint": 1}).All(&peerEndpoints)
-	log.Println("Done getting peers.")
+
+	for _, p := range peers {
+		peerEndpoints = append(peerEndpoints, p.Endpoint)
+	}
+
+	log.Println("Done getting peers, found ", len(peerEndpoints), " peers.")
 	return peerEndpoints
 }
 

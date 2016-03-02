@@ -19,26 +19,61 @@ login = function(){
 }
 
 getData = function(){
-  console.log("getting data")
 
+  checkLogin()
+  getMessages()
+  setTimeout(getData, 15000);
+}
+
+getMessages = function(){
   $.ajax({
     type: "GET",
-    url: "api/getAllData",
+    url: "api/getMessages",
     contentType: "application/json;charset=utf-8"
-  }).always(
-  function(data) {
-    console.log("We got the data");
-    console.log(data);
-    parseAllData(data)
+  }).always(function(data) {
+    console.log("Messages")
+    console.log(data)
+    displayMessages(data)
+  })
+}
+
+displayMessages = function(data){
+  var obj = JSON.parse(data)
+  console.log(obj)
+  var table = document.getElementById("messageTable")
+  table.getElementsByTagName("tbody")[0].innerHTML = table.rows[0].innerHTML;
+  for (var i = 0; i < obj.length; i++){
+    var row = table.insertRow(1);
+    var cell1 = row.insertCell(0);
+    var cell2 = row.insertCell(1);
+
+    cell1.innerHTML = obj[i].Originator
+    cell2.innerHTML = obj[i].Text
+  }
+  console.log(obj.length)
+  document.getElementById("messageNo").innerHTML = obj.length
+}
+
+checkLogin = function(){
+  $.ajax({
+    type: "GET",
+    url: "api/checkLogin",
+    contentType: "application/json;charset=utf-8"
+  }).always(function(data) {
+    console.log("Messages")
+    console.log(data)
+    displayMessages(data)
   })
 }
 
 parseAllData = function(data){
-  if(data == "notLoggedIn"){
-    $(".UserList").css('visibility','hidden');
+  if(data == "false"){
+    $(".data").css('visibility','hidden');
     $(".LogInPrompt").css('visibility','visible');
   }
   else {
+    $(".data").css('visibility','visible');
+    $(".LogInPrompt").css('visibility','hidden')
   }
 }
 
@@ -80,11 +115,28 @@ getToken = function() {
 loggedIn = function(data) {
   console.log(data)
   if (data == "Success"){
-    window.location.href= '/';
+    window.location.href= '/message.html';
   }
   else {
     alert("Login failed, please try again.");
   }
+}
+
+sendMessage = function() {
+  console.log("seding a message")
+
+  content = $("#messageData").val()
+  console.log(content)
+  
+  $.ajax({
+    type: "POST",
+    url: "/api/sendMessage",
+    data: content,
+    contentType: "plain/text;charset=utf-8"
+  }).success(function() {
+    alert("message sent!")
+  })
+
 }
 
 register = function() {

@@ -1,0 +1,54 @@
+<html>
+  <head>
+    <link rel="stylesheet" href="css/index.css">
+    <link rel="stylesheet" href="css/general.css">
+    <link rel="stylesheet" href="css/navbar.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+    <script src="scripts/main.js"></script>
+  </head>
+  <body onload="getData()">
+    <div class="navbar">
+    <ul>
+      <!-- I want to hide these if they're not logged in/ have it redirect to
+      login -->
+      <li><a href="index.html">Home</a></li>
+      <li><a href="message.html">Send Message</a></li>
+      <li><a href="peer.html">Add a Node</a></li>
+      <li><a href="login.html">Login</a></li>
+      <li><a href="register.html">Register</a></li>
+    </ul>
+  </div>
+    <div class="LogInPrompt">
+      <center>
+        <h2>
+          Please
+          <a href="login.html">login</a>
+          to send a message</h2>
+      </center>
+    </div>
+    <center>
+    <div class="data">
+      <textarea rows ="10" cols="50" id="messageData" placeholder="Write Message Here">
+        Write message here</textarea
+    </div>
+    <div class="data">
+      <button onclick="sendMessage()">submit</button>
+    </div>
+  </center>
+  <div class="data">
+    <center>
+      <br/>
+    <h2>Messages</h2>
+    <h3 id=messageNo></h3>
+  <table id="messageTable">
+    <thead>
+      <th>Originator</th>
+      <th>Message</th>
+    </thead>
+    <tbody>
+    </tbody>
+  </center>
+  </table>
+  </div>
+  </body>
+</html>

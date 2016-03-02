@@ -15,7 +15,7 @@ import (
 
 //We should redo all this session stuff with JWT sometime soon
 //SessionTimeout in terms of minutes.
-var sessionTimeout = 10.0
+var sessionTimeout = 30.0
 
 type userInformation struct {
 	Username        string
@@ -170,6 +170,8 @@ func checkSession(sessionKey string) bool {
 		elapsed := time.Since(result.LastSeen)
 		if elapsed.Minutes() > sessionTimeout {
 			log.Println("Session Inactive.")
+			//if our session was too long ago.
+			c.Remove(bson.M{"sessionkey": sessionKey})
 			return false
 		}
 		log.Println("Session Active.")
@@ -177,6 +179,7 @@ func checkSession(sessionKey string) bool {
 		return true
 
 	}
+	log.Println("Session key:", sessionKey, " does not exist.")
 	return false
 }
 
@@ -228,8 +231,29 @@ func checkCredentials(username string, password string) (userInformationWithID, 
 	return result, false
 }
 
-func generateUUID() *uuid.UUID {
-	toreturn, err := uuid.NewV5(uuid.NamespaceURL, []byte("josephmblodgett.com"))
+func setLastSeen(sessionKey string) {
+	log.Println("Setting last seen...")
+	session, err := mgo.Dial("localhost")
+	check(err)
+	defer session.Close()
+
+	session.SetMode(mgo.Monotonic, true)
+	c := session.DB(dbName).C("Sessions")
+
+	log.Println("Session key: ", sessionKey)
+	c.Update(bson.M{"sessionkey": sessionKey}, bson.M{"$set": bson.M{"lastseen": time.Now()}})
+
+	var s = sessionInfo{}
+
+	c.Find(bson.M{"sessionkey": sessionKey}).One(&s)
+
+	log.Println("New session Time: ", s.LastSeen)
+
+	log.Println("Last seen set to now.")
+}
+
+func generateUUID(username string, password string) *uuid.UUID {
+	toreturn, err := uuid.NewV5(uuid.NamespaceURL, []byte(username+password+sourceAddress))
 	check(err)
 	return toreturn
 }
@@ -246,7 +270,7 @@ func register(username string, password string) {
 	pass, err := bcrypt.GenerateFromPassword([]byte(password), 10)
 	check(err)
 
-	toSave := userInformation{username, pass, *generateUUID(), 0}
+	toSave := userInformation{username, pass, *generateUUID(username, string(pass)), 0}
 	c := session.DB(dbName).C("Users")
 	err = c.Insert(&toSave)
 

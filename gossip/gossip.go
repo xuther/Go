@@ -15,8 +15,9 @@ var dbName = "gossip"
 var sourceAddress = "https://localhost"
 var sourcePath = "/api/gossip"
 
-//There must be a better way to do this, but whatever.
-var PropagateRumorsChannel = make(chan RumorListToSend)
+//There must be a better way to do this, but whatever - we'll just make it global.
+//ALSO: is 20 enough? Will that deadlock the issue? Should I just make it abitrarily high?
+var PropagateRumorsChannel = make(chan RumorListToSend, 20)
 
 func takeAction(w http.ResponseWriter, r *http.Request) {
 	log.Println("Taking Action")
@@ -43,6 +44,8 @@ func checkCookie(r *http.Request) bool {
 		return false
 	}
 
+	//set the last seen to now
+	setLastSeen(cookie.Value)
 	return true
 }
 
@@ -126,16 +129,36 @@ func addPeerHandle(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func getMessagesHandle(w http.ResponseWriter, r *http.Request) {
+	if !checkCookie(r) {
+		redirectToLogin(w, r)
+		return
+	}
+
+	var messages []Rumor
+
+	for _, r := range getAllMessages() {
+		messages = append(messages, r.Messagelist...)
+	}
+
+	toSend, err := json.Marshal(messages)
+
+	check(err)
+
+	fmt.Fprint(w, string(toSend))
+}
+
 func gossipHandle(w http.ResponseWriter, r *http.Request) {
 	log.Println("Received gossip message.")
 	value, err := ioutil.ReadAll(r.Body)
 
-	var wantMessage Want
+	log.Println("Message contents: ", string(value))
 
-	err = json.Unmarshal(value, &wantMessage)
-	check(err)
+	if string(value[:7]) == "{\"Want\"" {
+		var wantMessage Want
+		err = json.Unmarshal(value, &wantMessage)
 
-	if err == nil {
+		check(err)
 		log.Println("Storing want message...")
 		//It was a want message, handle appropriately.
 		processWant(wantMessage, PropagateRumorsChannel)
@@ -144,13 +167,16 @@ func gossipHandle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var ReceivedRumor RumorMessage
-	json.Unmarshal(value, wantMessage)
+	if string(value[:8]) == "{\"Rumor\"" {
+		var ReceivedRumor RumorMessage
+		err = json.Unmarshal(value, &ReceivedRumor)
+		check(err)
 
-	check(err)
-	if err == nil {
 		log.Println("Storing Rumor...")
-		information := strings.Split(":", ReceivedRumor.Rumor.MessageID)
+		information := strings.Split(ReceivedRumor.Rumor.MessageID, ":")
+
+		log.Println("Split: ", information)
+
 		id, _ := strconv.Atoi(information[1])
 		rumorToSave := Rumor{ReceivedRumor.Rumor.MessageID, information[0],
 			id, ReceivedRumor.Rumor.Originator, ReceivedRumor.Rumor.Text}
@@ -164,6 +190,14 @@ func gossipHandle(w http.ResponseWriter, r *http.Request) {
 	//fmt.Fprintf(w, "Error, unrecognized request. Requre either a want message or a rumor message.")
 	http.Error(w, http.StatusText(400), 400)
 
+}
+
+func checkLogin(w http.ResponseWriter, r *http.Request) {
+	if checkCookie(r) {
+		fmt.Fprintf(w, "True")
+	} else {
+		fmt.Fprintf(w, "False")
+	}
 }
 
 func registerHandle(w http.ResponseWriter, r *http.Request) {
@@ -194,10 +228,15 @@ func check(err error) {
 
 func main() {
 	var port = flag.Int("port", 443, "The port number you want the server running on. Default is 8080")
+	var db = flag.String("db", "gossip", "The Mongo Database name to use.")
 
 	flag.Parse()
 
+	dbName = *db
 	sourceAddress = sourceAddress + ":" + strconv.Itoa(*port)
+
+	fmt.Println("Database: ", dbName)
+	fmt.Println("Port: ", sourceAddress)
 
 	//We probably want to set the log path here.
 
@@ -206,8 +245,10 @@ func main() {
 	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("Static/"))))
 	http.HandleFunc("/api/login", login)
 	http.HandleFunc("/api/sendMessage", sendMessageHandle)
+	http.HandleFunc("/api/getMessages", getMessagesHandle)
 	http.HandleFunc("/api/register", registerHandle)
 	http.HandleFunc("/api/addPeer", addPeerHandle)
+	http.HandleFunc("/api/checkLogin", checkLogin)
 	http.HandleFunc("/api/gossip", gossipHandle)
 
 	//start our propagation thread.
